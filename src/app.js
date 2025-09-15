@@ -6,7 +6,7 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.send('Ultimate Readiness');
+  res.send('Ultimate lkjlkj');
 });
 
 module.exports = app;
