@@ -6,7 +6,7 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.send('Hello, CI/CD! My project is even more ready!');
+  res.send('Hello, CI/CD is far more ready than before');
 });
 
 module.exports = app;
