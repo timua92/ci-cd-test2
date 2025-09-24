@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini To-Do (Multi-List)</title>
+  <style>
+    :root {
+      --bg:#0d0d0d; --panel:#171717; --ink:#e0e0e0; --muted:#9aa0a6; --line:#2b2b2b;
+      --brand:#00ffff; --accent:#007bff; --danger:#ff3131; --ok:#4ad5d5;
+      --radius:14px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    .app {
+      display: grid; grid-template-columns: 280px 1fr; gap: 14px;
+      height: 100%; padding: 16px;
+    }
+    /* Sidebar */
+    .sidebar {
+      background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .side-head { padding: 14px; border-bottom: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
+    .side-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+    .lists { overflow: auto; padding: 6px; }
+    .list-btn {
+      width: 100%; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid transparent;
+      background: transparent; color: var(--ink); cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+    }
+    .list-btn:hover { background: #1e1e1e; }
+    .list-btn.active { background: #111928; border-color: #1e3a5f; }
+    .pill { font-size: 12px; color: var(--muted); background: #0f172a; padding: 2px 8px; border-radius: 999px; }
+    .side-actions { padding: 12px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+    /* Main */
+    .main {
+      background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+      display: grid; grid-template-rows: auto auto 1fr; overflow: hidden;
+    }
+    .bar {
+      display: flex; align-items: center; gap: 8px; padding: 14px; border-bottom: 1px solid var(--line);
+    }
+    .bar input.title {
+      flex: 1; background: #0e0e0e; border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px 12px; color: var(--ink); font-weight: 600;
+    }
+    .bar .ghost { color: var(--muted); font-size: 13px; }
+    .add {
+      display: flex; gap: 8px; padding: 12px; border-bottom: 1px solid var(--line);
+    }
+    .add input[type="text"] {
+      flex: 1; background: #0e0e0e; border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px 12px; color: var(--ink);
+    }
+    .btn {
+      background: var(--accent); color: white; border: 0; border-radius: 10px; padding: 10px 12px; cursor: pointer;
+    }
+    .btn.ghost { background: transparent; color: var(--muted); border: 1px dashed var(--line); }
+    .btn.danger { background: var(--danger); }
+    .btn.ok { background: var(--ok); color: #0b1111; }
+    /* Items */
+    .items { overflow: auto; padding: 6px 12px 20px; display: grid; gap: 8px; }
+    .item {
+      display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center;
+      background: #0e0e0e; border: 1px solid var(--line); border-radius: 12px; padding: 10px;
+    }
+    .item input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--brand); }
+    .item input.desc {
+      background: transparent; border: 0; color: var(--ink); padding: 6px 8px; border-radius: 8px;
+    }
+    .item input.desc:focus { outline: 1px solid #1f2937; background: #121212; }
+    .item.done input.desc { color: var(--muted); text-decoration: line-through; }
+    .row { display: flex; align-items: center; gap: 6px; }
+    .small { font-size: 12px; color: var(--muted); }
+    .right { display: flex; gap: 6px; }
+    .danger-link { color: var(--danger); background: transparent; border: 0; cursor: pointer; }
+    /* Footer */
+    .footer { padding: 10px 14px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+    /* Mobile */
+    @media (max-width: 820px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { order: 2; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <!-- Sidebar: Lists -->
+    <aside class="sidebar">
+      <div class="side-head">
+        <h2>Lists</h2>
+        <span class="ghost">(# shows open items)</span>
+      </div>
+      <div id="lists" class="lists" role="navigation" aria-label="Lists"></div>
+      <div class="side-actions">
+        <button id="newListBtn" class="btn ok">+ New List</button>
+        <button id="renameListBtn" class="btn ghost">Rename</button>
+        <button id="deleteListBtn" class="btn danger">Delete</button>
+      </div>
+    </aside>
+
+    <!-- Main: Items -->
+    <main class="main">
+      <div class="bar">
+        <input id="listTitle" class="title" placeholder="List title…" />
+        <span class="ghost" id="openCount">0 open</span>
+      </div>
+      <form id="addForm" class="add" autocomplete="off">
+        <input id="newItem" type="text" placeholder="Add a task and press Enter…" aria-label="New task" />
+        <button class="btn" type="submit">Add</button>
+      </form>
+      <section id="items" class="items" aria-live="polite"></section>
+      <div class="footer">
+        <div class="small">
+          Tips: Enter to add • Click text to edit • Space toggles checkbox • Data saved locally
+        </div>
+        <div class="row">
+          <button id="clearDoneBtn" class="btn ghost" title="Remove completed">Clear completed</button>
+          <button id="markAllBtn" class="btn ghost" title="Mark all complete">Mark all done</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // --- Simple Multi-List To-Do (no deps). Data model -> localStorage.
+    const STORAGE_KEY = "mini-multi-todo.v1";
+    const $ = (s, el = document) => el.querySelector(s);
+    const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+
+    /** @typedef {{id:string, text:string, done:boolean, created:number}} Item */
+    /** @typedef {{id:string, name:string, items:Item[]}} List */
+
+    /** @type {{lists: List[], currentId: string|null}} */
+    let state = load() || seed();
+
+    // ---- Elements
+    const listsEl = $("#lists");
+    const listTitleEl = $("#listTitle");
+    const itemsEl = $("#items");
+    const addForm = $("#addForm");
+    const newItemEl = $("#newItem");
+    const openCountEl = $("#openCount");
+    const newListBtn = $("#newListBtn");
+    const deleteListBtn = $("#deleteListBtn");
+    const renameListBtn = $("#renameListBtn");
+    const clearDoneBtn = $("#clearDoneBtn");
+    const markAllBtn = $("#markAllBtn");
+
+    // ---- Init
+    render();
+    bindEvents();
+
+    // ---- Functions
+    function uid() { return (crypto?.randomUUID?.() || Date.now().toString(36)+Math.random().toString(36).slice(2)); }
+
+    function seed() {
+      const demo = {
+        id: uid(),
+        name: "My First List",
+        items: [
+          { id: uid(), text: "Add some tasks", done: false, created: Date.now() },
+          { id: uid(), text: "Mark items as complete", done: false, created: Date.now() },
+          { id: uid(), text: "Create another list", done: false, created: Date.now() },
+        ]
+      };
+      return { lists: [demo], currentId: demo.id };
+    }
+
+    function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    function load() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || ""); }
+      catch { return null; }
+    }
+
+    function currentList() {
+      return state.lists.find(l => l.id === state.currentId) || state.lists[0] || null;
+    }
+
+    function setCurrent(id) { state.currentId = id; save(); render(); }
+
+    function addList(name = "New List") {
+      const list = { id: uid(), name, items: [] };
+      state.lists.unshift(list);
+      state.currentId = list.id;
+      save(); render();
+    }
+
+    function deleteCurrentList() {
+      if (!currentList()) return;
+      if (!confirm("Delete this list? Items will be removed.")) return;
+      state.lists = state.lists.filter(l => l.id !== state.currentId);
+      state.currentId = state.lists[0]?.id ?? null;
+      save(); render();
+    }
+
+    function renameCurrentList() {
+      const list = currentList(); if (!list) return;
+      const name = prompt("New list name:", list.name);
+      if (!name) return;
+      list.name = name.trim();
+      save(); render();
+    }
+
+    function addItem(text) {
+      const list = currentList(); if (!list) return;
+      list.items.unshift({ id: uid(), text: text.trim(), done: false, created: Date.now() });
+      save(); render();
+    }
+
+    function toggleItem(id) {
+      const list = currentList(); if (!list) return;
+      const it = list.items.find(i => i.id === id); if (!it) return;
+      it.done = !it.done; save(); renderCounts();
+      // minimal DOM toggle to avoid full re-render flicker
+      const row = document.getElementById("item-"+id);
+      if (row) row.classList.toggle("done", it.done);
+    }
+
+    function updateItemText(id, text) {
+      const list = currentList(); if (!list) return;
+      const it = list.items.find(i => i.id === id); if (!it) return;
+      it.text = text.trim(); save(); // no full render needed
+    }
+
+    function removeItem(id) {
+      const list = currentList(); if (!list) return;
+      list.items = list.items.filter(i => i.id !== id);
+      save(); render();
+    }
+
+    function clearDone() {
+      const list = currentList(); if (!list) return;
+      list.items = list.items.filter(i => !i.done); save(); render();
+    }
+
+    function markAllDone() {
+      const list = currentList(); if (!list) return;
+      list.items.forEach(i => i.done = true); save(); render();
+    }
+
+    function render() {
+      // Sidebar lists
+      listsEl.innerHTML = state.lists.map(l => {
+        const open = l.items.filter(i => !i.done).length;
+        const active = l.id === state.currentId ? "active" : "";
+        return `<button class="list-btn ${active}" data-id="${l.id}">
+                  <span>${escapeHTML(l.name)}</span>
+                  <span class="pill">${open}</span>
+                </button>`;
+      }).join("") || `<div class="small" style="padding:10px 12px;">No lists yet.</div>`;
+
+      // Main area
+      const list = currentList();
+      if (!list) {
+        $(".main").innerHTML = `<div class="bar"><span>No list selected.</span></div>`;
+        return;
+      }
+      listTitleEl.value = list.name;
+
+      // Items
+      itemsEl.innerHTML = list.items.map(it => `
+        <div class="item ${it.done ? "done": ""}" id="item-${it.id}" data-id="${it.id}">
+          <input type="checkbox" ${it.done ? "checked": ""} aria-label="toggle ${escapeAttr(it.text)}" />
+          <input class="desc" value="${escapeAttr(it.text)}" />
+          <div class="right">
+            <button class="danger-link" title="Delete">✕</button>
+          </div>
+        </div>
+      `).join("");
+
+      renderCounts();
+      newItemEl.focus();
+    }
+
+    function renderCounts() {
+      const list = currentList(); if (!list) { openCountEl.textContent = ""; return; }
+      const open = list.items.filter(i => !i.done).length;
+      openCountEl.textContent = `${open} open`;
+      // refresh pills in sidebar
+      $$(".list-btn").forEach(btn => {
+        const id = btn.getAttribute("data-id");
+        const l = state.lists.find(x => x.id === id);
+        if (l) btn.querySelector(".pill").textContent = l.items.filter(i => !i.done).length;
+        btn.classList.toggle("active", id === state.currentId);
+      });
+    }
+
+    function bindEvents() {
+      listsEl.addEventListener("click", (e) => {
+        const btn = e.target.closest(".list-btn"); if (!btn) return;
+        setCurrent(btn.dataset.id);
+      });
+
+      addForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const text = newItemEl.value.trim();
+        if (!text) return;
+        addItem(text);
+        addForm.reset();
+      });
+
+      itemsEl.addEventListener("change", (e) => {
+        const row = e.target.closest(".item"); if (!row) return;
+        const id = row.dataset.id;
+        if (e.target.matches('input[type="checkbox"]')) toggleItem(id);
+      });
+
+      itemsEl.addEventListener("input", (e) => {
+        const row = e.target.closest(".item"); if (!row) return;
+        if (e.target.classList.contains("desc")) updateItemText(row.dataset.id, e.target.value);
+      });
+
+      itemsEl.addEventListener("click", (e) => {
+        const row = e.target.closest(".item"); if (!row) return;
+        if (e.target.matches(".danger-link")) removeItem(row.dataset.id);
+      });
+
+      listTitleEl.addEventListener("change", () => {
+        const list = currentList(); if (!list) return;
+        list.name = listTitleEl.value.trim() || "Untitled";
+        save(); render(); // re-render to update sidebar name
+      });
+
+      newListBtn.addEventListener("click", () => addList(prompt("List name:", "New List") || "New List"));
+      deleteListBtn.addEventListener("click", deleteCurrentList);
+      renameListBtn.addEventListener("click", renameCurrentList);
+      clearDoneBtn.addEventListener("click", clearDone);
+      markAllBtn.addEventListener("click", markAllDone);
+
+      // Keyboard niceties: Enter commits edits (already), Esc blurs.
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") document.activeElement?.blur?.();
+      });
+    }
+
+    // ---- Small HTML escape helpers
+    function escapeHTML(s=""){ return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+    function escapeAttr(s=""){ return escapeHTML(s).replace(/\n/g, " "); }
+  </script>
+</body>
+</html>
