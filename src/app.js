@@ -7,7 +7,7 @@ app.get('/health', (req, res) => {
 
 app.get('/', (req, res) => {
 
-  res.send('This is my updated text!');
+   res.sendFile(path.join(__dirname, "index.html"));
 
 });
 
